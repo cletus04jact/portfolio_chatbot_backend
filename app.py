@@ -27,11 +27,11 @@ model = genai.GenerativeModel("gemini-2.5-flash")
 # Resume data (this can be dynamically loaded from a file)
 RESUME_DATA = {
     "name": "Cletus",
-    "skills": ["Python", "Flask", "Machine Learning", "Langchain", "Excel"],
-    "experience": "3+ years of experience in data science and full-stack development.",
+    "skills": ["Python", "Flask", "Machine Learning", "Langchain", "AWS Redshift","PowerBI"],
+    "experience": "Over 8+ Months of hands-on experience in Data Science and Full-Stack Development, diverse project work across multiple organizations as an intern and freelance developer. Proven ability to deliver end-to-end solutions — from building robust data pipelines and machine learning models to deploying scalable web applications.",
     "projects": [
-        "AI Chatbot using Gemini and EmailJS",
-        "React Portfolio with Three.js 3D Scenes"
+        "Detection of Fake images,videos",
+        "AI complaint categorization system",
     ],
     "email": "cletusbobola@gmail.com",
     "phone": "6381174925"
@@ -92,39 +92,55 @@ async def chat(message: Message):
             session['step'] = 5
             return {"reply": "Awesome! You can now ask me anything about my resume or other queries."}
 
+    # Step 4: Phone number or "contact me" shortcut
     elif session['step'] == 4:
-        if is_valid_phone(text):
+        if "contact" in text or "how to reach" in text:
+            session['step'] = 5  # allow future Qs
+            return {
+                "reply": f"📧 You can contact me at {RESUME_DATA['email']} or call me at 📞 {RESUME_DATA['phone']}."
+            }
+        elif is_valid_phone(text):
             session['phone'] = text
             session['step'] = 5
-            return {"reply": "Got it! Now feel free to ask anything about my resume or general questions."}
+            return {"reply": "Got it! Now feel free to ask anything about my resume or contact me."}
         else:
-            return {"reply": "Invalid phone number. Please enter a valid one."}
+            return {"reply": "Invalid phone number. Please enter a valid one or type 'contact me' to skip."}
 
+    # Step 5+: Resume Q&A or Gemini response
     elif session['step'] >= 5:
-        if any(kw in text.lower() for kw in ["resume", "skill", "experience", "project"]):
-            if "skill" in text.lower():
+        # Resume-based questions
+        if any(kw in text for kw in ["resume", "skill", "experience", "project", "email", "phone", "contact"]):
+            if "skill" in text:
                 return {"reply": f"Here are my skills: {', '.join(RESUME_DATA['skills'])}"}
-            elif "experience" in text.lower():
+            elif "experience" in text:
                 return {"reply": f"Experience: {RESUME_DATA['experience']}"}
-            elif "project" in text.lower():
+            elif "project" in text:
                 return {"reply": f"Projects: {', '.join(RESUME_DATA['projects'])}"}
-            elif "email" in text.lower():
-                return {"reply": f"You can contact me at {RESUME_DATA['email']}"}
-            elif "phone" in text.lower():
-                return {"reply": f"📞 {RESUME_DATA['phone']}"}
+            elif "email" in text or "contact" in text:
+                return {"reply": f"📧 You can email me at {RESUME_DATA['email']}"}
+            elif "phone" in text or "call" in text:
+                return {"reply": f"📞 My phone number is {RESUME_DATA['phone']}"}
             else:
-                return {"reply": "Please clarify what you'd like to know about my resume."}
-            
-        if session['gemini_count'] >= 2:
+                return {"reply": "Can you clarify what you'd like to know about my resume?"}
+
+        # Block inappropriate queries
+        banned_words = ["love", "sex", "marry", "date", "go out", "relationship"]
+        if any(bad in text for bad in banned_words):
             return {
-                "reply": "I've answered your questions! 😊 For anything more, feel free to contact me at:\ncletusbobola@gmail.com\n WhatsApp: 6381174925"
+                "reply": "I'm here to assist you professionally. Let's keep our conversation respectful. You can contact me for work-related queries. 👋",
+            }
+
+        # Limit to 1 Gemini query
+        if session['gemini_count'] >= 1:
+            return {
+                "reply": "I've answered your questions! 😊 For anything more, feel free to contact me at:\ncletusbobola@gmail.com\nWhatsApp: 6381174925"
             }
 
         try:
             session['gemini_count'] += 1
-            response = model.generate_content(f"Respond politely. Do not flirt or use abusive language. Q: {text}")
+            response = model.generate_content(f"Respond politely and professionally. Q: {message.text}")
             return {"reply": response.text.strip()}
         except Exception as e:
-            return {"reply": f"⚠️ Error generating response"}
+            return {"reply": "⚠️ Sorry, I had trouble generating a response. Please try again later."}
 
-    return {"reply": "I didn't understand that. Can you please repeat?"}
+    return {"reply": "I didn't understand that. Could you try rephrasing your question?"}
