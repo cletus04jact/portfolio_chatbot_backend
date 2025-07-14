@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 import re
 import os
-import openai
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
