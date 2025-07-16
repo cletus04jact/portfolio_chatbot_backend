@@ -46,9 +46,9 @@ class Message(BaseModel):
     session_id: str
     text: str
 def send_full_chat_history_via_emailjs(name, email, phone, full_chat):
-    service_id = os.getenv("EMAILJS_SERVICE_ID")
-    template_id = os.getenv("EMAILJS_TEMPLATE_ID")
-    public_key = os.getenv("EMAILJS_PUBLIC_KEY")
+    service_id = "service_qcqv9vd"
+    template_id ="template_gri0orb"
+    public_key = "mLG_qJwlKvHNN7g2G"
 
     payload = {
         "service_id": service_id,
@@ -63,7 +63,7 @@ def send_full_chat_history_via_emailjs(name, email, phone, full_chat):
     }
 
     headers = {
-        "origin": "http://localhost",  # or your deployed frontend origin
+        "origin": "http://cletus.justsee.live",  # or your deployed frontend origin
         "Content-Type": "application/json"
     }
 
