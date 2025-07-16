@@ -5,6 +5,7 @@ import re
 import os
 from dotenv import load_dotenv
 from pydantic import ValidationError
+import requests
 
 load_dotenv()
 
@@ -44,6 +45,34 @@ user_sessions = {}
 class Message(BaseModel):
     session_id: str
     text: str
+def send_full_chat_history_via_emailjs(name, email, phone, full_chat):
+    service_id = os.getenv("EMAILJS_SERVICE_ID")
+    template_id = os.getenv("EMAILJS_TEMPLATE_ID")
+    public_key = os.getenv("EMAILJS_PUBLIC_KEY")
+
+    payload = {
+        "service_id": service_id,
+        "template_id": template_id,
+        "user_id": public_key,
+        "template_params": {
+            "from_name": name,
+            "reply_to": email,
+            "phone": phone,
+            "full_chat": full_chat,
+        }
+    }
+
+    headers = {
+        "origin": "http://localhost",  # or your deployed frontend origin
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post("https://api.emailjs.com/api/v1.0/email/send", json=payload, headers=headers)
+        response.raise_for_status()
+        print("✅ Full chat sent via EmailJS.")
+    except Exception as e:
+        print("❌ Failed to send chat history:", str(e))
 
 # Regex for phone validation
 def is_valid_phone(phone):
@@ -107,48 +136,76 @@ async def chat(message: Message):
         else:
             return {"reply": "Invalid phone number. Please enter a valid one or type 'contact me' to skip."}
 
-    # Step 5+: Resume Q&A or Gemini response
     elif session['step'] >= 5:
         # Resume-based questions
         if any(kw in text for kw in ["resume", "skill", "experience", "project", "email", "phone", "contact"]):
+            bot_reply = ""
             if "skill" in text:
-                return {"reply": f"Here are my skills: {', '.join(RESUME_DATA['skills'])}"}
+                bot_reply = f"Here are my skills: {', '.join(RESUME_DATA['skills'])}"
             elif "experience" in text:
-                return {"reply": f"Experience: {RESUME_DATA['experience']}"}
+                bot_reply = f"Experience: {RESUME_DATA['experience']}"
             elif "project" in text:
-                return {"reply": f"Projects: {', '.join(RESUME_DATA['projects'])}"}
+                bot_reply = f"Projects: {', '.join(RESUME_DATA['projects'])}"
             elif "email" in text or "contact" in text:
-                return {"reply": f"📧 You can email me at {RESUME_DATA['email']}"}
+                bot_reply = f"You can email me at {RESUME_DATA['email']}"
             elif "phone" in text or "call" in text:
-                return {"reply": f"📞 My phone number is {RESUME_DATA['phone']}"}
+                bot_reply = f" My phone number is {RESUME_DATA['phone']}"
             else:
-                return {"reply": "Can you clarify what you'd like to know about my resume?"}
+                bot_reply = "Can you clarify what you'd like to know about my resume?"
+
+            # Store chat history
+            chat_log = session.setdefault("chat_history", [])
+            chat_log.append(f"User: {text}")
+            chat_log.append(f"Cletus: {bot_reply}")
+
+            return {"reply": bot_reply}
 
         # Block inappropriate queries
         banned_words = ["love", "sex", "marry", "date", "go out", "relationship"]
         if any(bad in text for bad in banned_words):
-            return {
-                "reply": "I'm here to assist you professionally. Let's keep our conversation respectful. You can contact me for work-related queries. 👋",
-            }
+            reply = "I'm here to assist you professionally. Let's keep our conversation respectful. You can contact me for work-related queries. 👋"
+            session.setdefault("chat_history", []).append(f"User: {text}")
+            session["chat_history"].append(f"Cletus: {reply}")
+            return {"reply": reply}
 
         # Limit to 1 Gemini query
         if session['gemini_count'] >= 1:
-            return {
-                "reply": "I've answered your questions! 😊 For anything more, feel free to contact me at:\ncletusbobola@gmail.com\nWhatsApp: 6381174925"
-            }
+            reply = "I've answered your questions! 😊 For anything more, feel free to contact me at:\ncletusbobola@gmail.com\nWhatsApp: 6381174925"
+            session.setdefault("chat_history", []).append(f"User: {text}")
+            session["chat_history"].append(f"Cletus: {reply}")
+            return {"reply": reply}
 
+        # Gemini reply
         try:
             session['gemini_count'] += 1
             response = model.generate_content(
-    f"""You are Cletus, a startup-minded Machine Learning and Data Engineer.
-Your tone should be casual, confident, and clear—like a friendly tech founder explaining to someone new.
-Respond in first person with clear, thoughtful answers.
-Q: {message.text}
-"""
-)
+                f"""You are Cletus, a startup-minded Machine Learning and Data Engineer.
+    Your tone should be casual, confident, and clear—like a friendly tech founder explaining to someone new.
+    Respond in first person with clear, thoughtful answers.
+    Q: {message.text}"""
+            )
+            bot_reply = response.text.strip()
 
-            return {"reply": response.text.strip()}
+            # Save chat history
+            chat_log = session.setdefault("chat_history", [])
+            chat_log.append(f"User: {text}")
+            chat_log.append(f"Cletus: {bot_reply}")
+
+            # ✅ Send email if name/email available and not already sent
+            if session['name'] and session['email'] and not session.get('history_sent') and len(chat_log) >= 4:
+                full_chat = "\n".join(chat_log)
+                send_full_chat_history_via_emailjs(
+                    session['name'],
+                    session['email'],
+                    session.get('phone', 'Not Provided'),
+                    full_chat
+                )
+                session['history_sent'] = True
+
+            return {"reply": bot_reply}
+
         except Exception as e:
-            return {"reply": "⚠️ Sorry, I had trouble generating a response. Please try again later."}
+            return {"reply": "Sorry, I had trouble generating a response. Please try again later."}
+
 
     return {"reply": "I didn't understand that. Could you try rephrasing your question?"}
