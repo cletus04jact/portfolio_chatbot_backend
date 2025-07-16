@@ -170,7 +170,7 @@ async def chat(message: Message):
 
         # Limit to 1 Gemini query
         if session['gemini_count'] >= 1:
-            reply = "I've answered your questions! 😊 For anything more, feel free to contact me at:\ncletusbobola@gmail.com\nWhatsApp: 6381174925"
+            reply = "For anything more, feel free to contact me at:\ncletusbobola@gmail.com\nWhatsApp: 6381174925"
             session.setdefault("chat_history", []).append(f"User: {text}")
             session["chat_history"].append(f"Cletus: {reply}")
             return {"reply": reply}
