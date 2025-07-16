@@ -34,7 +34,8 @@ RESUME_DATA = {
         "AI complaint categorization system",
     ],
     "email": "cletusbobola@gmail.com",
-    "phone": "6381174925"
+    "phone": "6381174925",
+    "Tell me about yourself": "I am Cletus Sylphia,Machine Learning and Data Engineer with a passion for transforming raw data into intelligent, scalable solutions. I specialize in building ML models, data pipelines, and deploying AI-powered applications that drive real impact.Let’s build something amazing together!"
 }
 
 # State memory (for demo purposes only - not persistent)
@@ -138,7 +139,14 @@ async def chat(message: Message):
 
         try:
             session['gemini_count'] += 1
-            response = model.generate_content(f"Respond politely and professionally. Q: {message.text}")
+            response = model.generate_content(
+    f"""You are Cletus, a startup-minded Machine Learning and Data Engineer.
+Your tone should be casual, confident, and clear—like a friendly tech founder explaining to someone new.
+Respond in first person with clear, thoughtful answers.
+Q: {message.text}
+"""
+)
+
             return {"reply": response.text.strip()}
         except Exception as e:
             return {"reply": "⚠️ Sorry, I had trouble generating a response. Please try again later."}
